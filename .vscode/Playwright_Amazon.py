@@ -6,6 +6,7 @@ from playwright.async_api import async_playwright
 from urllib.parse import urljoin
 import re
 import json
+from datetime import datetime
 logging.getLogger().setLevel(logging.DEBUG)
 
 async def run_browser() : 
@@ -18,33 +19,24 @@ async def run_browser() :
 async def close_browser(p) : 
     await p.stop()
 
-async def scrap(page, item) :
-    scrap = await scrap_amazon(page, item)
+async def scrap(page, item, itemId) :
+    scrap = await scrap_amazon(page, item, itemId)
     return scrap
 
-async def scrap_amazon(page, item):
+async def scrap_amazon(page, item, itemId):
     base_url='https://www.amazon.com.br/'
     search_url = urljoin(base_url, f'/s?k={item}&page=1')
     await page.goto(search_url)
     html = await page.content()
     soup = BeautifulSoup(html, 'html.parser')
-    item_details = await amazon_data_parse(soup, item)
+    item_details = await amazon_data_parse(soup, item, itemId)
     return item_details
 
-def errhandling (expression, failsafe_value):
-    try :
-        value = expression
-    except:
-        value = failsafe_value
-    return value
-
-async def amazon_data_parse(soup, item_name):
+async def amazon_data_parse(soup, item_name, itemId):
     itens = soup.find_all('div',{'data-component-type' : "s-search-result"})
     item_list = []
     for count, item in enumerate(itens) : 
         asin = item.get('data-asin')
-        
-
         title = item.find_all('span',{'class' : 'a-size-base-plus a-color-base a-text-normal'})[0].get_text()
 
         try: 
@@ -76,7 +68,7 @@ async def amazon_data_parse(soup, item_name):
         except IndexError:
             ad = False
         
-        _ = {'index': count,
+        _ = {'productId' : itemId,
             'asin' : asin,
             'opt_label' : label,
             #"ad": True if (item.find_all('span', {'class' : 'a-color-secondary'})[0].get_text() == 'Patrocinado') else False ,
@@ -92,7 +84,7 @@ async def amazon_data_parse(soup, item_name):
     return item_list#)item_list#(itens#, 
 
 async def save_results(resultados, title):
-    with open(f'Data extraction\\data_{title}.json', 'w',) as fp:
+    with open(f'Data extraction\\{title} - {datetime.now().strftime("%Y%m%d-%H%M")}.json', 'w',) as fp:
         newlist = sorted(resultados, key=lambda d: d['similarity_ratio'], reverse=True) 
         json.dump(newlist, fp)
 
@@ -101,119 +93,35 @@ def simulatity_ratio (original_string : str, found_string : str) -> float:
     return s.ratio()
 
 
-async def run_scrap(item):
+async def run_scrap(item_list):
     page,p = await run_browser()
-    html = await scrap(page, item)
-    await save_results(html, item)
-    #sleep(30)
+    for item in product_item_list.iterrows():
+        item_name = item[1]['productName']
+        itemId = item[1]['productId']
+        html = await scrap(page, item_name, itemId)
+        await save_results(html, item_name)
+    # for item in item_list:
+    #     html = await scrap(page, item_name)
+    #     await save_results(html, item_name)
     await close_browser(p)
-    return html
     
 
-keyword_list = ['whisky jhonnie walker blue label - 750ml', 'whisky old parr 18 anos - 750ml', "whisky ballantine´s 12 anos 1L"]
-#resultado =  asyncio.run(run_scrap(keyword_list[1]))
-#print(f'foram capturados {len(resultado)} resultados')
-#print (resultado)
-for word in keyword_list:
-    asyncio.run(run_scrap(word))
+import pandas as pd
+input = pd.read_json(r'C:\Users\fabio\OneDrive\Python\Playwright_Scraping\Data input\result.json')
+df = pd.json_normalize(input['data']['productSearch']['products'])
+item_list = []
+for row in df.iterrows():
+    item_detail = {
+        'productId' : row[1]['productId'],
+        'productName' : row[1]['productName'],
+        'itemId' : row[1]['items'][0]['itemId'],
+        'ean' : row[1]['items'][0]['ean'],
+        'sellername' : row[1]['items'][0]['sellers'][0]['sellerName'],
+        'ListPrice' : row[1]['items'][0]['sellers'][0]['commertialOffer']['ListPrice']
+    }   
+    item_list.append(item_detail)
+df = pd.DataFrame(item_list)
+product_item_list = df[['productId','productName']]
 
-
-
-
-# async def main(keyword : str):    
-#     soup = await web_browser_search(keyword)
-    
-
-# async def web_browser_search(keyword) :
-#     async with async_playwright() as p:
-#         #carrega navegador e extrai conteúdo da página
-#         browser = await p.chromium.launch(headless=True)
-#         context = await browser.new_context(java_script_enabled=False,locale='pt-br', base_url='https://www.amazon.com.br/')
-#         page = await context.new_page()
-#         await page.goto(f'/s?k={keyword}&page=1')
-#         soup = BeautifulSoup(await page.content(), features='html.parser' )
-#         #sleep(0.5)
-#         #page.on("response", lambda response: print("<<", response.status, response.url, response.body))
-#         # print(soup)
-#         # print('================')
-#         # print(await page.content())
-#         #page.on("response", lambda response: print(response.body))
-#             #response = await response.body();
-
-#         resultados  = parse_search_results(keyword, soup)
-#         print(resultados)
-#         await browser.close()
-
-# def parse_search_results(keyword : str, content):
-#     resultados = []
-#     search_products = content.select("div.s-result-item[data-component-type=s-search-result]")
-#     for product in search_products:
-#         relative_url  = product.select("h2")[0].findChild("a")['href']
-#         product_url = urljoin('https://www.amazon.com.br/', relative_url).split("?")[0]
-#         asin = relative_url.split('/')[3] if len(relative_url.split('/')) >= 4 else None
-#         return {'list' : content.find_all("span", attrs={'data-component-type="s-search-results"'}),
-#             "keyword": keyword,
-#             "asin": asin,
-#             "url": product_url,
-#             "ad": "/slredirect/" in product_url,
-#             'title' : product.select("h2 > a > span")[0].text,
-#              }
-        
-        
-        
-
-
-
-
-
-# # def parse_search_results(keyword : str, content : page.c, page ):
-# #     resultados = []
-# #     search_products = content.select("div.s-result-item[data-component-type=s-search-result]")
-# #     for product in search_products[1]:
-# #         for link in product.find("h2", class_="a"):
-# #             relative_url  = link.get('href')
-# #             product_url = urljoin('https://www.amazon.com.br/', relative_url).split("?")[0]
-# #             asin = relative_url.split('/')[3] if len(relative_url.split('/')) >= 4 else None
-#     #     page.goto(product_url)
-#     #     return {
-#     #             "keyword": keyword,
-#     #             "asin": asin,
-#     #             "url": product_url,
-#     #             "ad": "/slredirect/" in product_url,
-#     #             "title": BeautifulSoup(page.inner_html("h2 > a > span"), "lxml").text,
-#     #             "price": page.inner_text(".a-price[data-a-size=xl] .a-offscreen"),
-#     #             "real_price": page.inner_text(".a-price[data-a-size=b] .a-offscreen"),
-#     #             "rating": (page.inner_text("span[aria-label~=stars]").re(r"(\d+\.*\d*) out") or [None])[0],
-#     #             "rating_count": page.inner_text("span[aria-label~=stars] + span[aria-label]"),
-#     #             "thumbnail_url": page.query_selector("//img.s-image")["src"],
-#     #         }
-#             #resultados.append((product_url, asin))
-#         #return product, a
-
-
-
-# # def parse_search_results(content : bs4.BeautifulSoup):
-# #     # Extract Overview Product Data
-# #     search_products = content.css("div.s-result-item[data-component-type=s-search-result]")
-# #     for product in search_products:
-# #         print(product)
-# #             #relative_url = product.css("h2>a::attr(href)").get()
-# #             #asin = relative_url.split('/')[3] if len(relative_url.split('/')) >= 4 else None
-# #         #     product_url = urljoin('https://www.amazon.com.br/', relative_url).split("?")[0]
-# #         #     yield  {
-# #         #             "keyword": keyword,
-# #         #             "asin": asin,
-# #         #             "url": product_url,
-# #         #             "ad": True if "/slredirect/" in product_url else False, 
-# #         #             "title": BeautifulSoup(product.css("h2>a>span::text").get(), "lxml").text,
-# #         #             #"title": product.css("h2>a>span::text").get(),
-# #         #             "price": product.css(".a-price[data-a-size=xl] .a-offscreen::text").get(),
-# #         #             "real_price": product.css(".a-price[data-a-size=b] .a-offscreen::text").get(),
-# #         #             "rating": (product.css("span[aria-label~=stars]::attr(aria-label)").re(r"(\d+\.*\d*) out") or [None])[0],
-# #         #             "rating_count": product.css("span[aria-label~=stars] + span::attr(aria-label)").get(),
-# #         #             "thumbnail_url": product.xpath("//img[has-class('s-image')]/@src").get(),
-# #         #         }
-
-
-# for item in keyword_list:
-#     asyncio.run(main(item))
+#keyword_list = ['whisky jhonnie walker blue label - 750ml', 'whisky old parr 18 anos - 750ml', "whisky ballantine´s 12 anos 1L"]
+asyncio.run(run_scrap(product_item_list))
