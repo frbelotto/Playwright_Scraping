@@ -1,0 +1,23 @@
+[project]
+name = "playwright-scraping"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Fábio Radicchi Belotto",email = "fabio_belotto@hotmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pandas (>=2.2.3,<3.0.0)",
+    "bs4 (>=0.0.2,<0.0.3)",
+    "playwright (>=1.50.0,<2.0.0)",
+    "amazoncaptcha (>=0.5.11,<0.6.0)",
+    "ipykernel (>=6.29.5,<7.0.0)",
+    "openpyxl (>=3.1.5,<4.0.0)",
+    "tf-playwright-stealth (>=1.1.1,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
