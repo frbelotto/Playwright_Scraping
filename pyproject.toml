@@ -6,7 +6,7 @@ authors = [
     {name = "Fábio Radicchi Belotto",email = "fabio_belotto@hotmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "pandas (>=2.2.3,<3.0.0)",
     "bs4 (>=0.0.2,<0.0.3)",
